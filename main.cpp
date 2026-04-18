@@ -35,7 +35,7 @@ uint8_t font[] = {
 struct Machine {
     uint8_t* memory = new uint8_t[0x1000]{}; // 4KB initialized to 0
 
-    stack<uint8_t> pila; // stack
+    stack<uint16_t> pila; // stack
 
     uint8_t sound_timer = 0;
     uint8_t delay_timer = 0;
