@@ -69,7 +69,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* SDL_OpenAudioDeviceStream starts the device paused. You have to tell it to start! */
     SDL_ResumeAudioStreamDevice(stream);
 
-    FILE *rom = fopen("IBM Logo.ch8", "rb");
+    FILE *rom = fopen("roms/bc_test.ch8", "rb");
     fread(m.memory + 0x200, 1, 0x1000 - 0x200, rom);
     fclose(rom);
 
