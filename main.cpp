@@ -3,6 +3,7 @@
 #include <SDL3/SDL_main.h>
 #include <iostream>
 #include <stack>
+#include <unordered_map>
 #include <chrono>
 
 /* We will use this renderer to draw into this window every frame. */
@@ -41,6 +42,9 @@ struct Machine {
     uint8_t delay_timer = 0;
     uint64_t last_tick = 0;
 
+    // True if a key is pressed down
+    bool keypad[16] = {};
+
     Machine() {
         // Set font in memory
         memcpy(memory + 0x50, font, sizeof(font));
@@ -49,6 +53,31 @@ struct Machine {
 
 Machine m;
 
+unordered_map<SDL_Scancode, uint8_t> keymap = {
+    {SDL_SCANCODE_X, 0x0},
+    {SDL_SCANCODE_1, 0x1},
+    {SDL_SCANCODE_2, 0x2},
+    {SDL_SCANCODE_3, 0x3},
+    {SDL_SCANCODE_Q, 0x4},
+    {SDL_SCANCODE_W, 0x5},
+    {SDL_SCANCODE_E, 0x6},
+    {SDL_SCANCODE_A, 0x7},
+    {SDL_SCANCODE_S, 0x8},
+    {SDL_SCANCODE_D, 0x9},
+    {SDL_SCANCODE_Z, 0xA},
+    {SDL_SCANCODE_C, 0xB},
+    {SDL_SCANCODE_4, 0xC},
+    {SDL_SCANCODE_R, 0xD},
+    {SDL_SCANCODE_F, 0xE},
+    {SDL_SCANCODE_V, 0xF}
+};
+
+void handle_input(SDL_Event *event) {
+    auto it = keymap.find(event->key.scancode);
+    if (it != keymap.end()) {
+        m.keypad[it->second] = (event->type == SDL_EVENT_KEY_DOWN);
+    }
+}
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
@@ -92,7 +121,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
         SDL_Log("beep");
-        m.sound_timer = 1;
+        m.sound_timer = 60;
+    }
+
+    if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
+        handle_input(event);
     }
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
@@ -106,7 +139,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         if (m.delay_timer > 0) m.delay_timer--;
         if (m.sound_timer > 0) m.sound_timer--;
         if (m.sound_timer == 0) SDL_FlushAudioStream(stream); // flush audio immediately
-        SDL_Log("%u", m.sound_timer);
         m.last_tick = now2;
     }
 
