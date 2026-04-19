@@ -1,55 +1,16 @@
 #define SDL_MAIN_USE_CALLBACKS 1  /* use the callbacks instead of main() */
-#include <SDL3/SDL.h>
+#include "globals.h"
 #include <SDL3/SDL_main.h>
 #include <iostream>
-#include <stack>
 #include <unordered_map>
 #include <chrono>
+#include "instructions.hpp"
 
 /* We will use this renderer to draw into this window every frame. */
-static SDL_Window *window = NULL;
-static SDL_Renderer *renderer = NULL;
 static SDL_AudioStream *stream = NULL;
 static int current_sine_sample = 0;
 
 using namespace std;
-
-uint8_t font[] = {
-    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-    0x20, 0x60, 0x20, 0x20, 0x70, // 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
-};
-
-struct Machine {
-    uint8_t* memory = new uint8_t[0x1000]{}; // 4KB initialized to 0
-
-    stack<uint16_t> pila; // stack
-
-    uint8_t sound_timer = 0;
-    uint8_t delay_timer = 0;
-    uint64_t last_tick = 0;
-
-    // True if a key is pressed down
-    bool keypad[16] = {};
-
-    Machine() {
-        // Set font in memory
-        memcpy(memory + 0x50, font, sizeof(font));
-    }
-};
 
 Machine m;
 
@@ -90,12 +51,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    if (!SDL_CreateWindowAndRenderer("examples/renderer/clear", 64, 32, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+    if (!SDL_CreateWindowAndRenderer("examples/renderer/clear", 640, 320, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
         SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
     SDL_SetRenderLogicalPresentation(renderer, 64, 32, SDL_LOGICAL_PRESENTATION_LETTERBOX);
-    SDL_Log("%u", m.memory[0x9E]);
 
     spec.channels = 1;
     spec.format = SDL_AUDIO_F32;
@@ -109,6 +69,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* SDL_OpenAudioDeviceStream starts the device paused. You have to tell it to start! */
     SDL_ResumeAudioStreamDevice(stream);
 
+    FILE *rom = fopen("IBM Logo.ch8", "rb");
+    fread(m.memory + 0x200, 1, 0x1000 - 0x200, rom);
+    fclose(rom);
+
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
@@ -117,11 +81,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
-    }
-
-    if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-        SDL_Log("beep");
-        m.sound_timer = 60;
     }
 
     if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
@@ -133,13 +92,13 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-    uint64_t now2 = SDL_GetTicks(); // milliseconds since start
+    uint64_t now = SDL_GetTicks(); // milliseconds since start
 
-    if (now2 - m.last_tick >= 1000 / 60) { // ~16ms per tick
+    if (now - m.last_tick >= 1000 / 60) { // ~16ms per tick
         if (m.delay_timer > 0) m.delay_timer--;
         if (m.sound_timer > 0) m.sound_timer--;
         if (m.sound_timer == 0) SDL_FlushAudioStream(stream); // flush audio immediately
-        m.last_tick = now2;
+        m.last_tick = now;
     }
 
     const int minimum_audio = (512 * sizeof(float)) / 2;
@@ -155,16 +114,28 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_PutAudioStreamData(stream, samples, sizeof(samples));
     }
 
-    const double now = ((double)SDL_GetTicks()) / 1000.0;  /* convert from milliseconds to seconds. */
-    /* choose the color for the frame we will draw. The sine wave trick makes it fade between colors smoothly. */
-    const float red = (float) (0.5 + 0.5 * SDL_sin(now));
-    const float green = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 2 / 3));
-    const float blue = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 4 / 3));
-    SDL_SetRenderDrawColorFloat(renderer, red, green, blue, SDL_ALPHA_OPAQUE_FLOAT);  /* new color, full alpha. */
+    if (now - m.last_cpu_tick >= 1000 / 700) {
+        uint16_t instruction = m.fetch();
+
+        decode(instruction, m);
+
+        m.last_cpu_tick = now;
+    }
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);  /* new color, full alpha. */
 
     /* clear the window to the draw color. */
     SDL_RenderClear(renderer);
-
+    for (int y = 0; y < 32; y++) {
+        for (int x = 0; x < 64; x++) {
+            if (m.display[y * 64 + x]) {
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // on
+            } else {
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // off
+            }
+            SDL_RenderPoint(renderer, x, y);
+        }
+    }
     /* put the newly-cleared rendering on the screen. */
     SDL_RenderPresent(renderer);
 
