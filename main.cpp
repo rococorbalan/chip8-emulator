@@ -17,7 +17,18 @@ Machine m;
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     SDL_AudioSpec spec;
-    srand(time(NULL));
+
+    srand(time(NULL)); // Seed rand
+
+    if (argc < 2) {
+        SDL_Log("Usage: ./main <rom path>");
+        return SDL_APP_FAILURE;
+    }
+
+    // Load ROM to memory from argv
+    FILE *rom = fopen(argv[1], "rb");
+    fread(m.memory + 0x200, 1, 0x1000 - 0x200, rom);
+    fclose(rom);
 
     SDL_SetAppMetadata("Example Renderer Clear", "1.0", "com.example.renderer-clear");
 
@@ -43,10 +54,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* SDL_OpenAudioDeviceStream starts the device paused. You have to tell it to start! */
     SDL_ResumeAudioStreamDevice(stream);
-
-    FILE *rom = fopen("roms/3-corax+.ch8", "rb");
-    fread(m.memory + 0x200, 1, 0x1000 - 0x200, rom);
-    fclose(rom);
 
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
