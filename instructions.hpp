@@ -42,3 +42,4 @@ struct Machine {
 };
 
 void decode(uint16_t instruction, Machine &m);
+void handle_input(SDL_Event *event, Machine &m);

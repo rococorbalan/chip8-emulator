@@ -2,7 +2,6 @@
 #include "globals.h"
 #include <SDL3/SDL_main.h>
 #include <iostream>
-#include <unordered_map>
 #include <chrono>
 #include "instructions.hpp"
 
@@ -14,35 +13,11 @@ using namespace std;
 
 Machine m;
 
-unordered_map<SDL_Scancode, uint8_t> keymap = {
-    {SDL_SCANCODE_X, 0x0},
-    {SDL_SCANCODE_1, 0x1},
-    {SDL_SCANCODE_2, 0x2},
-    {SDL_SCANCODE_3, 0x3},
-    {SDL_SCANCODE_Q, 0x4},
-    {SDL_SCANCODE_W, 0x5},
-    {SDL_SCANCODE_E, 0x6},
-    {SDL_SCANCODE_A, 0x7},
-    {SDL_SCANCODE_S, 0x8},
-    {SDL_SCANCODE_D, 0x9},
-    {SDL_SCANCODE_Z, 0xA},
-    {SDL_SCANCODE_C, 0xB},
-    {SDL_SCANCODE_4, 0xC},
-    {SDL_SCANCODE_R, 0xD},
-    {SDL_SCANCODE_F, 0xE},
-    {SDL_SCANCODE_V, 0xF}
-};
-
-void handle_input(SDL_Event *event) {
-    auto it = keymap.find(event->key.scancode);
-    if (it != keymap.end()) {
-        m.keypad[it->second] = (event->type == SDL_EVENT_KEY_DOWN);
-    }
-}
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     SDL_AudioSpec spec;
+    srand(time(NULL));
 
     SDL_SetAppMetadata("Example Renderer Clear", "1.0", "com.example.renderer-clear");
 
@@ -69,7 +44,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* SDL_OpenAudioDeviceStream starts the device paused. You have to tell it to start! */
     SDL_ResumeAudioStreamDevice(stream);
 
-    FILE *rom = fopen("roms/bc_test.ch8", "rb");
+    FILE *rom = fopen("roms/3-corax+.ch8", "rb");
     fread(m.memory + 0x200, 1, 0x1000 - 0x200, rom);
     fclose(rom);
 
@@ -84,7 +59,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     }
 
     if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
-        handle_input(event);
+        handle_input(event, m);
     }
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
