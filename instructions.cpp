@@ -65,7 +65,8 @@ void decode(uint16_t instruction, Machine &m) {
         case(0x0):
             switch(NNN(instruction)){
                 case(0x0E0): // 00E0: clear screen
-                   memset(m.display, 0, sizeof(m.display));
+                    memset(m.display, 0, sizeof(m.display));
+                    m.display_dirty = true;
                     break;
                 case(0x0EE): // 00EE: return from subrutine
                     m.PC = m.pila.top();
@@ -204,6 +205,7 @@ void decode(uint16_t instruction, Machine &m) {
                 y_coord++;
                 if (y_coord >= 32) break;
             }
+            m.display_dirty = true;
             break;
         }
 

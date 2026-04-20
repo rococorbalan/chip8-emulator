@@ -106,20 +106,24 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);  /* new color, full alpha. */
 
-    /* clear the window to the draw color. */
-    SDL_RenderClear(renderer);
-    for (int y = 0; y < 32; y++) {
-        for (int x = 0; x < 64; x++) {
-            if (m.display[y * 64 + x]) {
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // on
-            } else {
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // off
+    if(m.display_dirty) {
+        /* clear the window to the draw color. */
+        SDL_RenderClear(renderer);
+        for (int y = 0; y < 32; y++) {
+            for (int x = 0; x < 64; x++) {
+                if (m.display[y * 64 + x]) {
+                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // on
+                } else {
+                    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // off
+                }
+                SDL_RenderPoint(renderer, x, y);
             }
-            SDL_RenderPoint(renderer, x, y);
         }
+        /* put the newly-cleared rendering on the screen. */
+        SDL_RenderPresent(renderer);
+        m.display_dirty = false;
     }
-    /* put the newly-cleared rendering on the screen. */
-    SDL_RenderPresent(renderer);
+    
 
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }

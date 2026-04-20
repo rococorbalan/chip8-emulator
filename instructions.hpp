@@ -27,6 +27,7 @@ struct Machine {
     uint8_t V[16] = {};
 
     bool display[64 * 32] = {};
+    bool display_dirty = false;
 
     Machine() {
         // Set font in memory
