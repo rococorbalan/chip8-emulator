@@ -274,7 +274,7 @@ void decode(uint16_t instruction, Machine &m) {
                         }
                     }
                     break;
-                case(0x66): // FX66: Load V0 - VX from I
+                case(0x65): // FX65: Load V0 - VX from I
                     if(STORE_LOAD_IMPLEMENTATION == "new"){
                         for(uint8_t i = 0; i <= X(instruction); i++) {
                             m.V[i] = m.memory[m.I + i];
