@@ -41,7 +41,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    SDL_SetRenderLogicalPresentation(renderer, 64, 32, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    
+    ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer3_Init(renderer);
 
     spec.channels = 1;
     spec.format = SDL_AUDIO_F32;
@@ -61,6 +69,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 /* This function runs when a new event (mouse input, keypresses, etc) occurs. */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
+
+    ImGui_ImplSDL3_ProcessEvent(event);
+
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
     }
@@ -104,26 +115,38 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         m.last_cpu_tick = now;
     }
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);  /* new color, full alpha. */
+    ImGui_ImplSDL3_NewFrame();
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui::NewFrame();
 
-    if(m.display_dirty) {
+    ImGui::Begin("Test");
+    ImGui::Text("ImGui works!");
+    ImGui::End();
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);  /* new color, full alpha. */
+    SDL_RenderClear(renderer);
+
         /* clear the window to the draw color. */
-        SDL_RenderClear(renderer);
-        for (int y = 0; y < 32; y++) {
-            for (int x = 0; x < 64; x++) {
-                if (m.display[y * 64 + x]) {
-                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // on
-                } else {
-                    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // off
-                }
-                SDL_RenderPoint(renderer, x, y);
+    const int scale = 10;
+    for (int y = 0; y < 32; y++) {
+        for (int x = 0; x < 64; x++) {
+            if (m.display[y * 64 + x]) {
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // on
+                SDL_FRect rect = { (float)x * scale, (float)y * scale, (float)scale, (float)scale };
+                SDL_RenderFillRect(renderer, &rect);
+            } else {
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // off
+                SDL_FRect rect = { (float)x * scale, (float)y * scale, (float)scale, (float)scale };
+                SDL_RenderFillRect(renderer, &rect);
             }
         }
-        /* put the newly-cleared rendering on the screen. */
-        SDL_RenderPresent(renderer);
-        m.display_dirty = false;
     }
     
+
+    ImGui::Render();
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+
+    SDL_RenderPresent(renderer);
 
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
@@ -132,4 +155,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     /* SDL will clean up the window/renderer for us. */
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
 }
